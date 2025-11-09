@@ -174,4 +174,24 @@ public class AudioManager : MonoBehaviour
         }
         return null;
     }
+
+    /// <summary>
+    /// (新功能) 根据ID获取特殊音效片段，用于音乐回放
+    /// </summary>
+    public AudioClip GetSpecialNoteClip(int noteID)
+    {
+        if (specialNoteSounds != null && specialNoteSounds.Length > noteID && noteID >= 0 && specialNoteSounds[noteID] != null)
+        {
+            return specialNoteSounds[noteID];
+        }
+        
+        // 如果没找到，播放第一个作为默认
+        if (specialNoteSounds != null && specialNoteSounds.Length > 0 && specialNoteSounds[0] != null)
+        {
+            return specialNoteSounds[0];
+        }
+        
+        return null; // 实在没有就返回空
+    }
+
 }
