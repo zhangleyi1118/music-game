@@ -7,10 +7,6 @@ public class CubeController : MonoBehaviour
     [Tooltip("旋律音高 ID (对应 AudioManager 中的 cubeHitSounds 索引, 13-72)")]
     public int noteID = 13; 
 
-    [Header("节奏音设置 (行走)")]
-    [Tooltip("节奏音 ID (对应 AudioManager 中的 walkingNoteSounds 索引, 0=底鼓, 1=军鼓, 等)")]
-    public int walkingNoteID = 0;
-
     [Header("视觉效果")]
     [Tooltip("是否为特殊方块（例如黑键，仅用于视觉）")]
     public bool isSpecial = false;

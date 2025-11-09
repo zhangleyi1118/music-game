@@ -15,6 +15,13 @@ public class PlayerMoveLoopState : PlayerMovementState
         animancer.Play(moveLoopData.moveLoop);
         OnCheckInput();
         reusableData.rotationValueParameter.CurrentValue = 0;
+        
+        // --- 核心修改：开始播放循环音效 ---
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayWalkingLoop();
+        }
+        // --- 修改结束 ---
     }
 
 
@@ -82,6 +89,13 @@ public class PlayerMoveLoopState : PlayerMovementState
     {
         base.OnExit();
         timerServer.RemoveTimer(tid);
+        
+        // --- 核心修改：停止播放循环音效 ---
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.StopWalkingLoop();
+        }
+        // --- 修改结束 ---
     }
     private void OnCheckMoveEnd(InputAction.CallbackContext context)
     {

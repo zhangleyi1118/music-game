@@ -24,7 +24,6 @@ public class MusicGameManager : MonoBehaviour
     public float notePlaybackDelay = 0.5f; 
 
     private bool gameHasEnded = false;
-    // (这是我们上一步添加的，请确保它在这里)
     public bool GameHasEnded => gameHasEnded; 
 
     // 单例
@@ -75,10 +74,10 @@ public class MusicGameManager : MonoBehaviour
     {
         if (gameHasEnded) return;
 
-        // 1. 录制音符 (正数)
+        // 录制音符 (正数)
         playedNotes.Add(noteID);
         
-        // 2. 播放音效 (通过 AudioManager)
+        // 播放音效
         if (AudioManager.Instance != null)
         {
             AudioManager.Instance.PlayCubeHitSound(noteID);
@@ -86,20 +85,16 @@ public class MusicGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// (新功能) 由 CollectibleNote (小圆球) 调用
-    /// --- 核心修改：添加 specialNoteID 参数 ---
+    /// 由 CollectibleNote (小圆球) 调用
     /// </summary>
-    public void RegisterCollectibleHit(int specialNoteID) // <-- 修改点 1：添加参数
+    public void RegisterCollectibleHit(int specialNoteID) 
     {
         if (gameHasEnded) return;
         
         orbsCollected++;
         UpdateUI();
         
-        // --- 修改点 2：录制小球音效 ---
-        // 技巧：我们将 ID 存为负数来区分。
-        // (specialNoteID 0 会被存为 -1)
-        // (specialNoteID 1 会被存为 -2)
+        // 录制小球音效 (负数)
         playedNotes.Add(-(specialNoteID + 1)); 
     }
 
@@ -145,7 +140,7 @@ public class MusicGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// --- 核心修改：让协程能识别负数ID ---
+    /// (已修改) 回放协程
     /// </summary>
     private IEnumerator PlaybackRoutine()
     {
@@ -154,9 +149,15 @@ public class MusicGameManager : MonoBehaviour
 
         Debug.Log("开始回放音乐...");
 
+        // --- 核心修改 1：在回放开始时，播放行走循环音 ---
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayWalkingLoop();
+        }
+        // --- 修改结束 ---
+
         foreach (int noteID in playedNotes)
         {
-            // --- 修改点 3：检查 ID 是正数还是负数 ---
             AudioClip clip = null;
             
             if (noteID >= 0) // 正数 = Cube 旋律音
@@ -165,11 +166,9 @@ public class MusicGameManager : MonoBehaviour
             }
             else // 负数 = 小球 特殊音效
             {
-                // 把 -1 转回 0, -2 转回 1 ...
                 int specialID = -(noteID + 1); 
-                clip = AudioManager.Instance.GetSpecialNoteClip(specialID); // <-- 我们需要在 AudioManager 中创建这个新函数
+                clip = AudioManager.Instance.GetSpecialNoteClip(specialID);
             }
-            // --- 修改结束 ---
 
             if (clip != null)
             {
@@ -179,6 +178,14 @@ public class MusicGameManager : MonoBehaviour
         }
         
         Debug.Log("回放结束。");
+        
+        // --- 核心修改 2：在回放结束后，停止行走循环音 ---
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.StopWalkingLoop();
+        }
+        // --- 修改结束 ---
+        
         if (playbackButton != null)
             playbackButton.interactable = true;
     }

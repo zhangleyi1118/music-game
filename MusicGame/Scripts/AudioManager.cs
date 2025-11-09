@@ -7,6 +7,11 @@ public class AudioManager : MonoBehaviour
     public AudioSource sfxSource;
     public AudioSource playerSource;
     
+    // --- 核心修改 1：为行走循环添加专属音源 ---
+    [Tooltip("用于播放行走/奔跑循环音效的音源")]
+    public AudioSource walkingLoopSource; 
+    // --- 修改结束 ---
+    
     [Header("音乐设置")]
     public AudioClip[] levelMusic;
     public float musicVolume = 0.7f;
@@ -15,13 +20,18 @@ public class AudioManager : MonoBehaviour
     [Header("音效库")]
     public AudioClip jumpSound;
     public AudioClip climbSound;
-    public AudioClip[] footstepSounds;
+    public AudioClip[] footstepSounds; // (这个现在可以不用了，但我们先留着)
     
     [Tooltip("旋律音库 (钢琴音) - 数组长度至少为73，以匹配NoteID 13-72")]
     public AudioClip[] cubeHitSounds; 
     
+    // --- 核心修改 2：添加循环音效文件 ---
+    [Tooltip("行走/奔跑的循环音效 (例如一个鼓点)")]
+    public AudioClip walkingLoopSound; 
+    // --- 修改结束 ---
+
     [Tooltip("节奏音库 (鼓点) - 0=底鼓, 1=军鼓, 2=镲片, etc.")]
-    public AudioClip[] walkingNoteSounds; // <--- 添加这一行 (节奏音)
+    public AudioClip[] walkingNoteSounds; // (这个现在也不需要了)
 
     [Tooltip("特殊收集物音效库 (小圆球)")]
     public AudioClip[] specialNoteSounds; 
@@ -70,6 +80,17 @@ public class AudioManager : MonoBehaviour
             playerSource = gameObject.AddComponent<AudioSource>();
             playerSource.volume = sfxVolume * 0.8f;
         }
+
+        // --- 核心修改 3：设置新的循环音源 ---
+        if (walkingLoopSource == null)
+        {
+            Debug.LogWarning("WalkingLoopSource 未在 Inspector 中指定，正在自动创建。");
+            walkingLoopSource = gameObject.AddComponent<AudioSource>();
+        }
+        // 关键：确保它是循环播放的
+        walkingLoopSource.loop = true; 
+        walkingLoopSource.volume = playerSource.volume; // 和玩家音量保持一致
+        // --- 修改结束 ---
     }
     
     public void PlayMusic(int levelIndex = 0)
@@ -100,11 +121,7 @@ public class AudioManager : MonoBehaviour
     
     public void PlayFootstepSound()
     {
-        if (footstepSounds.Length > 0)
-        {
-            int index = Random.Range(0, footstepSounds.Length);
-            playerSource.PlayOneShot(footstepSounds[index]);
-        }
+        // (这个函数现在没用了)
     }
     
     public void PlayCubeHitSound(int cubeType = 0)
@@ -115,16 +132,9 @@ public class AudioManager : MonoBehaviour
             Debug.LogWarning($"Cube Hit Sound (Melody) for noteID {cubeType} is missing!");
     }
 
-    /// <summary>
-    /// (新功能) 播放行走节奏音
-    /// </summary>
     public void PlayWalkingSound(int noteID)
     {
-        if (walkingNoteSounds != null && walkingNoteSounds.Length > noteID && noteID >= 0 && walkingNoteSounds[noteID] != null)
-        {
-            // 使用 playerSource 播放节奏音可能感觉更真实
-            playerSource.PlayOneShot(walkingNoteSounds[noteID]);
-        }
+        // (这个函数现在也没用了)
     }
 
     public void PlaySpecialNoteSound(int noteID) 
@@ -158,6 +168,10 @@ public class AudioManager : MonoBehaviour
         sfxVolume = Mathf.Clamp01(volume);
         sfxSource.volume = sfxVolume;
         playerSource.volume = sfxVolume * 0.8f;
+        
+        // (也更新循环音源的音量)
+        if(walkingLoopSource != null)
+            walkingLoopSource.volume = playerSource.volume;
     }
 
     public int GetMaxNoteTypes()
@@ -175,23 +189,42 @@ public class AudioManager : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// (新功能) 根据ID获取特殊音效片段，用于音乐回放
-    /// </summary>
+    // (这是我们上一步为录制小球添加的，请保留)
     public AudioClip GetSpecialNoteClip(int noteID)
     {
         if (specialNoteSounds != null && specialNoteSounds.Length > noteID && noteID >= 0 && specialNoteSounds[noteID] != null)
         {
             return specialNoteSounds[noteID];
         }
-        
-        // 如果没找到，播放第一个作为默认
         if (specialNoteSounds != null && specialNoteSounds.Length > 0 && specialNoteSounds[0] != null)
         {
             return specialNoteSounds[0];
         }
+        return null; 
+    }
+    
+    // --- 核心修改 4：添加两个新的公共函数来控制循环 ---
+
+    /// <summary>
+    /// 开始播放行走循环音效
+    /// </summary>
+    public void PlayWalkingLoop()
+    {
+        if (walkingLoopSource.isPlaying || walkingLoopSound == null) return;
         
-        return null; // 实在没有就返回空
+        walkingLoopSource.clip = walkingLoopSound;
+        walkingLoopSource.Play();
     }
 
+    /// <summary>
+    /// 停止播放行走循环音效
+    /// </summary>
+    public void StopWalkingLoop()
+    {
+        if (walkingLoopSource.isPlaying)
+        {
+            walkingLoopSource.Stop();
+        }
+    }
+    // --- 修改结束 ---
 }
