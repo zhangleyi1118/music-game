@@ -59,5 +59,15 @@ public class Player : CharacterBase
         StateMachine?.OnAnimationEnd();
     }
 
-    // --- 核心修改：删除了整个 OnFootstep() 函数 ---
+    // --- 核心修复：添加这个 OnDestroy 方法 ---
+    protected void OnDestroy()
+    {
+        // 确保在 Player 被销毁时，
+        // 当前状态会取消订阅所有持久化事件（例如 InputService）
+        if (StateMachine != null && StateMachine.currentState != null)
+        {
+            StateMachine.currentState.OnExit();
+        }
+    }
+    // --- 修复结束 ---
 }

@@ -61,15 +61,10 @@ public class CollectibleNote : MonoBehaviour
 
     private void Update()
     {
-        if (currentState == MoveState.Stopped)
+        if (currentState == MoveState.Stopped || 
+            (MusicGameManager.Instance != null && MusicGameManager.Instance.IsGamePaused))
         {
-            return;
-        }
-        
-        if (MusicGameManager.Instance != null && MusicGameManager.Instance.GameHasEnded)
-        {
-            currentState = MoveState.Stopped;
-            SetVisible(false); 
+            // 如果游戏已停止(玩家按了E)或已被收集，则不执行任何操作
             return;
         }
 
@@ -121,13 +116,11 @@ public class CollectibleNote : MonoBehaviour
 
         if (other.CompareTag(playerTag))
         {
-            Player player = other.GetComponent<Player>();
-
-            // (这是我们之前修正的蹲下逻辑，保持不变)
-            if (player != null && player.ReusableData.standValueParameter.CurrentValue == 0f) 
-            {
-                return; 
-            }
+            // Player player = other.GetComponent<Player>(); // <-- 1. 删除
+            // if (player != null && player.ReusableData.standValueParameter.CurrentValue == 0f) // <-- 2. 删除
+            // { // <-- 3. 删除
+            //     return; 
+            // } // <-- 4. 删除
             
             OnCollectedEffects(); 
             StartWaiting(); 
