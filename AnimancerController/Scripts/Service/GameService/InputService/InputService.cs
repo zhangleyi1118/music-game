@@ -1,5 +1,3 @@
-
-
 using UnityEngine;
 /**************************************************************************
 作者: HuHu
@@ -23,13 +21,20 @@ public class InputService : MonoSingleton<InputService>
             inputMap.Enable();
         }
     }
+    
+    // --- 核心修改在这里 ---
+    // 我们必须移除 Disable() 调用，
+    // 因为它在场景重新加载时会永久禁用输入系统。
     private void OnDestroy()
     {
+        /*
         if (inputMap != null)
         {
             inputMap.Disable();
         }
+        */
     }
+    // --- 修改结束 ---
 
     /// <summary>
     /// 封装走和跑以及PC和安卓的区别的移动量

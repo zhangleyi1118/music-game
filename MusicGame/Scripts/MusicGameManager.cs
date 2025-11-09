@@ -3,27 +3,29 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro; 
 using UnityEngine.UI; 
-using UnityEngine.SceneManagement; // 1. 引入场景管理
+using UnityEngine.SceneManagement; 
+using System.IO; 
+using System;   
+
+// 为编辑器添加引用
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class MusicGameManager : MonoBehaviour
 {
     [Header("游戏状态")]
-    // private int orbsCollected = 0; // <-- 2. 已删除
-    private bool isGamePaused = false; // <-- 3. 将 'gameHasEnded' 改名为 'isGamePaused'
-    
-    // (这是我们之前添加的，请确保它在这里，并改用 isGamePaused)
-    // 确保小球脚本可以检查游戏是否暂停
+    private bool isGamePaused = false; 
     public bool IsGamePaused => isGamePaused; 
 
     [Header("UI组件")]
-    // public TextMeshProUGUI orbCountText; // <-- 4. 已删除
-    public GameObject endLevelPanel; // (现在是“暂停菜单”)
-    // public TextMeshProUGUI finalOrbCountText; // <-- 5. 已删除
+    public GameObject endLevelPanel; 
     
     [Header("暂停菜单按钮")]
-    public Button playbackButton; // “播放录音”按钮
-    public Button continueButton; // “继续演奏”按钮
-    public Button restartButton;  // “重新开始” (重新验证) 按钮
+    public Button playbackButton; 
+    public Button continueButton; 
+    public Button restartButton;  // (功能是“退出”)
+    public Button saveButton;     // “保存录音”按钮
 
     [Header("音乐录制")]
     [Tooltip("玩家踩出的音符序列")]
@@ -33,7 +35,7 @@ public class MusicGameManager : MonoBehaviour
     public AudioSource playbackAudioSource;
     public float notePlaybackDelay = 0.5f; 
 
-    private Coroutine playbackCoroutine; // 用于停止协程
+    private Coroutine playbackCoroutine; 
 
     // 单例
     private static MusicGameManager instance;
@@ -58,16 +60,14 @@ public class MusicGameManager : MonoBehaviour
     
     public void InitializeGame()
     {
-        isGamePaused = false; // 确保游戏开始时未暂停
-        Time.timeScale = 1f;  // 确保时间正常流动
+        isGamePaused = false; 
+        Time.timeScale = 1f;  
         playedNotes.Clear();
         
-        // UpdateUI(); // <-- 6. 已删除
-        
         if (endLevelPanel != null)
-            endLevelPanel.SetActive(false); // <-- 这会在新场景加载时隐藏Panel
+            endLevelPanel.SetActive(false); 
 
-        // --- 7. 绑定所有按钮的点击事件 ---
+        // 绑定所有按钮的点击事件
         if (playbackButton != null)
             playbackButton.onClick.AddListener(PlayRecordedMusic);
         
@@ -75,13 +75,18 @@ public class MusicGameManager : MonoBehaviour
             continueButton.onClick.AddListener(ResumeGame);
             
         if (restartButton != null)
-            restartButton.onClick.AddListener(RestartGame);
-        // --- 修改结束 ---
+            restartButton.onClick.AddListener(ExitGame); 
+            
+        if (saveButton != null)
+            saveButton.onClick.AddListener(SaveRecording); 
         
+        // --- 修改：确保 playbackAudioSource 存在 ---
+        // 之前这个检查在 Start() 中，但 InitializeGame() 可能会被重复调用
         if (playbackAudioSource == null)
         {
             playbackAudioSource = gameObject.AddComponent<AudioSource>();
         }
+        // --- 修改结束 ---
     }
     
     /// <summary>
@@ -89,12 +94,10 @@ public class MusicGameManager : MonoBehaviour
     /// </summary>
     public void RegisterNoteHit(int noteID)
     {
-        if (isGamePaused) return; // <-- 8. 检查是否暂停
+        if (isGamePaused) return; 
 
-        // 1. 录制音符 (正数)
         playedNotes.Add(noteID);
         
-        // 2. 播放音效 (通过 AudioManager)
         if (AudioManager.Instance != null)
         {
             AudioManager.Instance.PlayCubeHitSound(noteID);
@@ -106,27 +109,20 @@ public class MusicGameManager : MonoBehaviour
     /// </summary>
     public void RegisterCollectibleHit(int specialNoteID) 
     {
-        if (isGamePaused) return; // <-- 8. 检查是否暂停
+        if (isGamePaused) return; 
         
-        // orbsCollected++; // <-- 9. 已删除
-        // UpdateUI(); // <-- 9. 已删除
-        
-        // 只保留录制功能
         playedNotes.Add(-(specialNoteID + 1)); 
     }
 
-    // private void UpdateUI() { } // <-- 10. 整个函数已删除
-
     /// <summary>
-    /// --- 11. 核心修改：从 EndGame 改为 PauseGame ---
     /// 暂停游戏并显示菜单
     /// </summary>
     public void PauseGame()
     {
-        if (isGamePaused) return; // 已经在暂停了
+        if (isGamePaused) return; 
         
         isGamePaused = true;
-        Time.timeScale = 0f; // 暂停所有物理和时间
+        Time.timeScale = 0f; 
         
         if (endLevelPanel != null)
         {
@@ -134,62 +130,94 @@ public class MusicGameManager : MonoBehaviour
         }
         
         Debug.Log("游戏暂停!");
+        
+        if (saveButton != null)
+        {
+            saveButton.interactable = playedNotes.Count > 0;
+        }
     }
 
     /// <summary>
-    /// --- 12. 新功能：“继续演奏”按钮调用 ---
+    /// “继续演奏”按钮调用
     /// </summary>
     public void ResumeGame()
     {
-        if (!isGamePaused) return; // 游戏没暂停
+        if (!isGamePaused) return; 
 
-        // 停止可能正在播放的音乐
         if (playbackCoroutine != null)
         {
             StopCoroutine(playbackCoroutine);
             playbackCoroutine = null;
         }
-        if (playbackAudioSource.isPlaying)
+        if (playbackAudioSource != null && playbackAudioSource.isPlaying)
         {
             playbackAudioSource.Stop();
         }
         if (AudioManager.Instance != null)
         {
-            // 停止行走和回放的鼓点
             AudioManager.Instance.StopWalkingLoop(); 
         }
 
-        // 恢复游戏
         isGamePaused = false;
-        Time.timeScale = 1f; // 恢复时间流动
+        Time.timeScale = 1f; 
         
         if (endLevelPanel != null)
         {
             endLevelPanel.SetActive(false);
         }
         
-        // 恢复按钮交互
         SetMenuButtonsInteractable(true);
         
         Debug.Log("游戏继续!");
     }
     
     /// <summary>
-    /// --- 13. 新功能：“重新验证/开始”按钮调用 ---
+    /// 退出游戏
     /// </summary>
-    public void RestartGame()
+    public void ExitGame()
     {
-        // 必须在加载场景前重置时间
-        Time.timeScale = 1f; 
-        isGamePaused = false;
-        
-        // 重新加载当前场景
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        Debug.Log("重新开始!");
+        Debug.Log("退出游戏!");
+
+        #if UNITY_EDITOR
+        EditorApplication.isPlaying = false;
+        #else
+        Application.Quit();
+        #endif
     }
     
     /// <summary>
-    /// --- 14. 新功能：切换暂停/继续 ---
+    /// 保存录音功能 (保存到桌面)
+    /// </summary>
+    public void SaveRecording()
+    {
+        if (playedNotes.Count == 0)
+        {
+            Debug.LogWarning("没有录音，无需保存。");
+            return;
+        }
+
+        NoteRecording recordingData = new NoteRecording();
+        recordingData.notes = playedNotes;
+        string json = JsonUtility.ToJson(recordingData, true); 
+
+        string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        string timeStamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+        string fileName = $"MusicRecording_{timeStamp}.json";
+        string path = Path.Combine(desktopPath, fileName);
+        
+        try
+        {
+            File.WriteAllText(path, json);
+            Debug.Log($"录音已成功保存到你的桌面: {path}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"保存录音失败: {e.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// 切换暂停/继续
     /// </summary>
     public void TogglePauseMenu()
     {
@@ -214,7 +242,6 @@ public class MusicGameManager : MonoBehaviour
             return;
         }
         
-        // 防止重复播放
         if (playbackCoroutine != null)
         {
             StopCoroutine(playbackCoroutine);
@@ -222,54 +249,86 @@ public class MusicGameManager : MonoBehaviour
         playbackCoroutine = StartCoroutine(PlaybackRoutine());
     }
 
+    // --- (!!!) 核心修改在这里 (!!!) ---
+    /// <summary>
+    /// 回放协程 (增加了详细的日志和空值检查)
+    /// </summary>
     private IEnumerator PlaybackRoutine()
     {
-        // 15. 播放时禁用所有按钮
         SetMenuButtonsInteractable(false); 
+        Debug.Log("PlaybackRoutine: 开始回放音乐...");
 
-        Debug.Log("开始回放音乐...");
-
-        if (AudioManager.Instance != null)
+        // --- 1. 添加了对关键组件的空检查 ---
+        if (AudioManager.Instance == null)
         {
-            AudioManager.Instance.PlayWalkingLoop(); // 播放背景鼓点
+            Debug.LogError("PlaybackRoutine: AudioManager.Instance 为空！无法播放。");
+            SetMenuButtonsInteractable(true);
+            playbackCoroutine = null;
+            yield break; // 提前退出协程
         }
+        if (playbackAudioSource == null)
+        {
+            Debug.LogError("PlaybackRoutine: playbackAudioSource 为空！请在 Inspector 中分配它。");
+            SetMenuButtonsInteractable(true);
+            playbackCoroutine = null;
+            yield break; // 提前退出协程
+        }
+        // --- 检查结束 ---
 
+        AudioManager.Instance.PlayWalkingLoop(); 
+
+        int noteIndex = 0;
         foreach (int noteID in playedNotes)
         {
             AudioClip clip = null;
-            
-            if (noteID >= 0) // Cube 旋律音
+            string clipSource = "N/A";
+
+            try
             {
-                clip = AudioManager.Instance.GetCubeHitClip(noteID);
+                if (noteID >= 0) // Cube 旋律音
+                {
+                    clipSource = $"Cube (ID: {noteID})";
+                    clip = AudioManager.Instance.GetCubeHitClip(noteID);
+                }
+                else // 小球 特殊音效
+                {
+                    int specialID = -(noteID + 1); 
+                    clipSource = $"Special (ID: {specialID})";
+                    clip = AudioManager.Instance.GetSpecialNoteClip(specialID);
+                }
             }
-            else // 小球 特殊音效
+            catch (Exception e)
             {
-                int specialID = -(noteID + 1); 
-                clip = AudioManager.Instance.GetSpecialNoteClip(specialID);
+                Debug.LogError($"PlaybackRoutine: 在 AudioManager 中获取音符时出错 (Index: {noteIndex}, Source: {clipSource}): {e.Message}");
+                continue; // 跳过这个音符
             }
 
-            if (clip != null)
+            // --- 2. 修改了空值检查方式并增加了日志 ---
+            // 使用 (clip) 而不是 (clip != null) 是检查 Unity Object 是否“真实”存在的更安全方式
+            // 这将捕获 "null" 和 "missing" (资源丢失) 两种情况
+            if (clip) 
             {
-                playbackAudioSource.PlayOneShot(clip);
-                // 在 Realtime 中等待，因为 Time.timeScale 是 0
+                // Debug.Log($"PlaybackRoutine: 正在播放 Note {noteIndex} (Source: {clipSource})");
+                playbackAudioSource.PlayOneShot(clip); 
                 yield return new WaitForSecondsRealtime(notePlaybackDelay); 
             }
+            else
+            {
+                // 这将告诉我们问题所在：AudioManager 正在返回 null。
+                Debug.LogWarning($"PlaybackRoutine: 跳过 Note {noteIndex} (Source: {clipSource})，因为找到的 AudioClip 为 null。请检查 AudioManager 和它引用的音效文件。");
+            }
+            // --- 修改结束 ---
+            noteIndex++;
         }
         
-        Debug.Log("回放结束。");
-        
-        if (AudioManager.Instance != null)
-        {
-            AudioManager.Instance.StopWalkingLoop(); // 停止背景鼓点
-        }
-        
-        // 16. 播放结束后恢复所有按钮
+        Debug.Log("PlaybackRoutine: 回放结束。");
+        AudioManager.Instance.StopWalkingLoop(); 
         SetMenuButtonsInteractable(true); 
         playbackCoroutine = null;
     }
     
     /// <summary>
-    /// --- 17. 新功能：统一管理按钮状态 ---
+    /// 统一管理按钮状态
     /// </summary>
     private void SetMenuButtonsInteractable(bool state)
     {
@@ -279,15 +338,28 @@ public class MusicGameManager : MonoBehaviour
             continueButton.interactable = state;
         if (restartButton != null)
             restartButton.interactable = state;
+            
+        if (saveButton != null)
+        {
+            saveButton.interactable = state && (playedNotes.Count > 0);
+        }
     }
     
-    // (仅用于测试)
     private void Update()
     {
-        // --- 18. 核心修改：按 E 键切换暂停菜单 ---
+        // 按 E 键切换暂停菜单
         if (Input.GetKeyDown(KeyCode.E))
         {
             TogglePauseMenu();
         }
     }
+}
+
+/// <summary>
+/// 用于JSON序列化的辅助类
+/// </summary>
+[Serializable]
+public class NoteRecording
+{
+    public List<int> notes;
 }
