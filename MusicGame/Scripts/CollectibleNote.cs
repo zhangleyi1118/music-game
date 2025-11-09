@@ -21,12 +21,19 @@ public class CollectibleNote : MonoBehaviour
     private void Start()
     {
         startPos = transform.position;
+        // 确保它有一个触发器
+        Collider col = GetComponent<Collider>();
+        if (col != null && !col.isTrigger)
+        {
+            Debug.LogWarning($"Collider on {name} is not set to 'Is Trigger'. Forcing it.", this);
+            col.isTrigger = true;
+        }
     }
 
     private void Update()
     {
         // 简单的上下飘动效果
-        if (animateFloat)
+        if (animateFloat && !collected)
         {
             float newY = startPos.y + Mathf.Sin(Time.time * floatSpeed) * floatAmplitude;
             transform.position = new Vector3(startPos.x, newY, startPos.z);
@@ -65,8 +72,7 @@ public class CollectibleNote : MonoBehaviour
             Instantiate(collectEffectPrefab, transform.position, Quaternion.identity);
         }
 
-        // 4. 销毁自己
-        // (可以加一个淡出协程，但为了快速实现，先直接销毁)
+        // 4. 销毁自己 (可以加一个淡出协程，但为了快速实现，先直接销毁)
         Destroy(gameObject);
     }
 }

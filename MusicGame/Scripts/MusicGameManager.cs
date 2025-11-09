@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro; // 保持 TextMeshPro
+using UnityEngine.UI; // 引入 Button
 
 public class MusicGameManager : MonoBehaviour
 {
@@ -12,7 +13,7 @@ public class MusicGameManager : MonoBehaviour
     public TextMeshProUGUI orbCountText; // 替换 scoreText
     public GameObject endLevelPanel; // 替换 gameOverPanel
     public TextMeshProUGUI finalOrbCountText; // 替换 finalScoreText
-    public UnityEngine.UI.Button playbackButton; // 播放音乐按钮
+    public Button playbackButton; // 播放音乐按钮
 
     [Header("音乐录制")]
     [Tooltip("玩家踩出的音符序列")]
@@ -86,7 +87,7 @@ public class MusicGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 由新脚本 CollectibleNote 调用
+    /// (新功能) 由 CollectibleNote (小圆球) 调用
     /// </summary>
     public void RegisterCollectibleHit()
     {
@@ -102,7 +103,7 @@ public class MusicGameManager : MonoBehaviour
     private void UpdateUI()
     {
         if (orbCountText != null)
-            orbCountText.text = $"收集: {orbsCollected}";
+            orbCountText.text = $"音符: {orbsCollected}"; // 你可以改成你喜欢的文本
     }
 
     /// <summary>
@@ -152,7 +153,7 @@ public class MusicGameManager : MonoBehaviour
             {
                 playbackAudioSource.PlayOneShot(clip);
                 
-                // 等待一个固定延迟，或者 clip 的长度
+                // 等待一个固定延迟
                 yield return new WaitForSeconds(notePlaybackDelay); 
             }
         }

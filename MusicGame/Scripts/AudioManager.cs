@@ -16,10 +16,16 @@ public class AudioManager : MonoBehaviour
     public AudioClip jumpSound;
     public AudioClip climbSound;
     public AudioClip[] footstepSounds;
-    [Tooltip("方块音符库 (钢琴音)")]
-    public AudioClip[] cubeHitSounds;
+    
+    [Tooltip("旋律音库 (钢琴音) - 数组长度至少为73，以匹配NoteID 13-72")]
+    public AudioClip[] cubeHitSounds; 
+    
+    [Tooltip("节奏音库 (鼓点) - 0=底鼓, 1=军鼓, 2=镲片, etc.")]
+    public AudioClip[] walkingNoteSounds; // <--- 添加这一行 (节奏音)
+
     [Tooltip("特殊收集物音效库 (小圆球)")]
-    public AudioClip[] specialNoteSounds; // <-- 这是新添加的行
+    public AudioClip[] specialNoteSounds; 
+    
     public AudioClip staffLineHitSound;
     public AudioClip gameOverSound;
     
@@ -103,24 +109,29 @@ public class AudioManager : MonoBehaviour
     
     public void PlayCubeHitSound(int cubeType = 0)
     {
-        if (cubeHitSounds.Length > cubeType && cubeHitSounds[cubeType] != null)
+        if (cubeHitSounds.Length > cubeType && cubeType >= 0 && cubeHitSounds[cubeType] != null)
             sfxSource.PlayOneShot(cubeHitSounds[cubeType]);
+        else if (cubeType != 0)
+            Debug.LogWarning($"Cube Hit Sound (Melody) for noteID {cubeType} is missing!");
     }
 
     /// <summary>
-    /// (新功能) 播放特殊小圆球音效
+    /// (新功能) 播放行走节奏音
     /// </summary>
-    public void PlaySpecialNoteSound(int noteID)
+    public void PlayWalkingSound(int noteID)
+    {
+        if (walkingNoteSounds != null && walkingNoteSounds.Length > noteID && noteID >= 0 && walkingNoteSounds[noteID] != null)
+        {
+            // 使用 playerSource 播放节奏音可能感觉更真实
+            playerSource.PlayOneShot(walkingNoteSounds[noteID]);
+        }
+    }
+
+    public void PlaySpecialNoteSound(int noteID) 
     {
         if (specialNoteSounds != null && specialNoteSounds.Length > noteID && noteID >= 0 && specialNoteSounds[noteID] != null)
         {
             sfxSource.PlayOneShot(specialNoteSounds[noteID]);
-        }
-        else if (specialNoteSounds != null && specialNoteSounds.Length > 0 && specialNoteSounds[0] != null)
-        {
-            // 如果ID无效或超出范围，播放第一个作为默认音效
-            Debug.LogWarning($"Special Note ID {noteID} not found, playing default.");
-            sfxSource.PlayOneShot(specialNoteSounds[0]);
         }
     }
     
@@ -149,18 +160,12 @@ public class AudioManager : MonoBehaviour
         playerSource.volume = sfxVolume * 0.8f;
     }
 
-    /// <summary>
-    /// 获取音效片段总数，用于Cube随机化
-    /// </summary>
     public int GetMaxNoteTypes()
     {
         if (cubeHitSounds == null) return 0;
         return cubeHitSounds.Length;
     }
 
-    /// <summary>
-    /// 根据ID获取音效片段，用于音乐回放
-    /// </summary>
     public AudioClip GetCubeHitClip(int noteID)
     {
         if (cubeHitSounds != null && cubeHitSounds.Length > noteID && noteID >= 0)
