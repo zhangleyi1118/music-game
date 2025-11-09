@@ -128,4 +128,25 @@ public class AudioManager : MonoBehaviour
         sfxSource.volume = sfxVolume;
         playerSource.volume = sfxVolume * 0.8f;
     }
+
+    /// <summary>
+    /// 获取音效片段总数，用于Cube随机化
+    /// </summary>
+    public int GetMaxNoteTypes()
+    {
+        if (cubeHitSounds == null) return 0;
+        return cubeHitSounds.Length;
+    }
+
+    /// <summary>
+    /// 根据ID获取音效片段，用于音乐回放
+    /// </summary>
+    public AudioClip GetCubeHitClip(int noteID)
+    {
+        if (cubeHitSounds != null && cubeHitSounds.Length > noteID && noteID >= 0)
+        {
+            return cubeHitSounds[noteID];
+        }
+        return null;
+    }
 }

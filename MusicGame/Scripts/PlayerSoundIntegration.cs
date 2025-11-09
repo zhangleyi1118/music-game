@@ -2,14 +2,14 @@ using UnityEngine;
 
 public class PlayerSoundIntegration : MonoBehaviour
 {
-    // 这个脚本用于集成现有的玩家状态机与音乐游戏音效系统
+    // 这个脚本用于集成现有的玩家状态机与 AudioManager
     
     private void Start()
     {
-        // 确保音乐游戏管理器存在
-        if (MusicGameManager.Instance == null)
+        // 确保 AudioManager 存在
+        if (AudioManager.Instance == null)
         {
-            Debug.LogWarning("MusicGameManager 未找到，请确保场景中有 MusicGameManager");
+            Debug.LogWarning("AudioManager 未找到，请确保场景中有 AudioManager");
         }
     }
     
@@ -17,25 +17,25 @@ public class PlayerSoundIntegration : MonoBehaviour
     
     public void PlayJumpSound()
     {
-        if (MusicGameManager.Instance != null)
+        if (AudioManager.Instance != null)
         {
-            MusicGameManager.Instance.PlayJumpSound();
+            AudioManager.Instance.PlayJumpSound();
         }
     }
     
     public void PlayClimbSound()
     {
-        if (MusicGameManager.Instance != null)
+        if (AudioManager.Instance != null)
         {
-            MusicGameManager.Instance.PlayClimbSound();
+            AudioManager.Instance.PlayClimbSound();
         }
     }
     
     public void PlayFootstepSound()
     {
-        if (MusicGameManager.Instance != null)
+        if (AudioManager.Instance != null)
         {
-            MusicGameManager.Instance.PlayFootstepSound();
+            AudioManager.Instance.PlayFootstepSound();
         }
     }
     

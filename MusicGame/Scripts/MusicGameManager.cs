@@ -1,44 +1,30 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro; // 添加TextMeshPro支持
+using TMPro; // 保持 TextMeshPro
 
 public class MusicGameManager : MonoBehaviour
 {
-    [Header("音乐设置")]
-    public AudioSource backgroundMusic;
-    public AudioClip[] levelMusic;
-    public float[] bpmArray; // 每分钟节拍数
-    public float currentBPM = 120f;
-    
-    [Header("节拍系统")]
-    public float beatInterval; // 节拍间隔时间
-    public float currentBeatTime = 0f;
-    public int currentBeat = 0;
-    public bool isPlaying = false;
-    
     [Header("游戏状态")]
     public int score = 0;
-    public int combo = 0;
-    public int maxCombo = 0;
-    public bool gameOver = false;
     
     [Header("UI组件")]
-    [Tooltip("TextMeshPro文本组件")]
     public TextMeshProUGUI scoreText;
-    public TextMeshProUGUI comboText;
-    public TextMeshProUGUI maxComboText;
-    public Slider healthBar;
-    public GameObject gameOverPanel;
+    public GameObject gameOverPanel; // 用于显示最终得分和播放按钮
+    public TextMeshProUGUI finalScoreText;
+    public UnityEngine.UI.Button playbackButton; // 播放音乐按钮
+
+    [Header("音乐录制")]
+    [Tooltip("玩家踩出的音符序列")]
+    public List<int> playedNotes = new List<int>();
     
-    [Header("音效")]
-    public AudioSource effectAudio;
-    public AudioClip jumpSound;
-    public AudioClip climbSound;
-    public AudioClip[] footstepSounds;
-    public AudioClip[] cubeHitSounds;
-    
+    [Tooltip("用于回放音乐的AudioSource")]
+    public AudioSource playbackAudioSource;
+    public float notePlaybackDelay = 0.5f; // 每个音符播放的间隔
+
+    private bool gameHasEnded = false;
+
+    // 单例
     private static MusicGameManager instance;
     public static MusicGameManager Instance => instance;
     
@@ -47,7 +33,6 @@ public class MusicGameManager : MonoBehaviour
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -63,148 +48,119 @@ public class MusicGameManager : MonoBehaviour
     public void InitializeGame()
     {
         score = 0;
-        combo = 0;
-        maxCombo = 0;
-        gameOver = false;
+        gameHasEnded = false;
+        playedNotes.Clear();
         
-        // 计算节拍间隔
-        beatInterval = 60f / currentBPM;
-        
-        // 开始播放音乐
-        if (backgroundMusic != null && levelMusic.Length > 0)
-        {
-            backgroundMusic.clip = levelMusic[0];
-            backgroundMusic.Play();
-            isPlaying = true;
-        }
-        
-        // 初始化UI
         UpdateUI();
         
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
-    }
-    
-    private void Update()
-    {
-        if (!isPlaying || gameOver) return;
+
+        if (playbackButton != null)
+            playbackButton.onClick.AddListener(PlayRecordedMusic);
         
-        // 更新节拍计时
-        currentBeatTime += Time.deltaTime;
-        
-        // 检查是否到达下一节拍
-        if (currentBeatTime >= beatInterval)
+        // 确保回放源存在
+        if (playbackAudioSource == null)
         {
-            currentBeatTime = 0f;
-            currentBeat++;
-            OnBeat();
+            playbackAudioSource = gameObject.AddComponent<AudioSource>();
         }
     }
     
-    private void OnBeat()
+    /// <summary>
+    /// 由 CubeController 调用
+    /// </summary>
+    public void RegisterNoteHit(int noteID, int points)
     {
-        // 这里可以触发节拍事件，比如生成新的五线谱线
-        Debug.Log("节拍: " + currentBeat);
+        if (gameHasEnded) return;
+
+        // 1. 录制音符
+        playedNotes.Add(noteID);
         
-        // 每隔4个节拍生成五线谱
-        if (currentBeat % 4 == 0)
-        {
-            SpawnStaffLine();
-        }
-    }
-    
-    private void SpawnStaffLine()
-    {
-        // 生成五线谱逻辑
-        // 这里需要创建五线谱对象
-        Debug.Log("生成五线谱");
-    }
-    
-    public void AddScore(int points, bool perfectHit = false)
-    {
-        if (perfectHit)
-        {
-            points *= 2; // 完美命中双倍分数
-            combo++;
-            if (combo > maxCombo)
-                maxCombo = combo;
-        }
-        else
-        {
-            combo = 0; // 重置连击
-        }
-        
+        // 2. 增加分数
         score += points;
         UpdateUI();
-    }
-    
-    public void TakeDamage(float damage)
-    {
-        if (healthBar != null)
+        
+        // 3. 播放音效 (通过 AudioManager)
+        if (AudioManager.Instance != null)
         {
-            healthBar.value -= damage;
-            
-            if (healthBar.value <= 0)
-            {
-                GameOver();
-            }
+            AudioManager.Instance.PlayCubeHitSound(noteID);
+            AudioManager.Instance.PlayJumpSound(); // 玩家的跳跃音效
         }
     }
-    
-    private void GameOver()
-    {
-        gameOver = true;
-        isPlaying = false;
-        
-        if (gameOverPanel != null)
-            gameOverPanel.SetActive(true);
-        
-        Debug.Log("游戏结束! 最终分数: " + score + " 最大连击: " + maxCombo);
-    }
-    
+
+    /// <summary>
+    /// 更新分数显示
+    /// </summary>
     private void UpdateUI()
     {
         if (scoreText != null)
             scoreText.text = $"Score: {score}";
+    }
+
+    /// <summary>
+    /// (示例) 游戏结束
+    /// </summary>
+    public void EndGame()
+    {
+        if (gameHasEnded) return;
+        gameHasEnded = true;
         
-        if (comboText != null)
-            comboText.text = $"Combo: {combo}";
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(true);
+            if (finalScoreText != null)
+                finalScoreText.text = $"Final Score: {score}";
+        }
         
-        if (maxComboText != null)
-            maxComboText.text = $"Max Combo: {maxCombo}";
+        Debug.Log("游戏结束! 录制的音符数量: " + playedNotes.Count);
     }
     
-    // 音效方法
-    public void PlayJumpSound()
+    /// <summary>
+    /// 播放录制好的音乐
+    /// </summary>
+    public void PlayRecordedMusic()
     {
-        if (effectAudio != null && jumpSound != null)
+        if (playedNotes.Count == 0)
         {
-            effectAudio.PlayOneShot(jumpSound);
+            Debug.Log("没有录制到音符。");
+            return;
         }
+        
+        StartCoroutine(PlaybackRoutine());
     }
-    
-    public void PlayClimbSound()
+
+    private IEnumerator PlaybackRoutine()
     {
-        if (effectAudio != null && climbSound != null)
+        if (playbackButton != null)
+            playbackButton.interactable = false; // 防止重复点击
+
+        Debug.Log("开始回放音乐...");
+
+        foreach (int noteID in playedNotes)
         {
-            effectAudio.PlayOneShot(climbSound);
+            // 从 AudioManager 获取音效片段
+            AudioClip clip = AudioManager.Instance.GetCubeHitClip(noteID);
+            if (clip != null)
+            {
+                playbackAudioSource.PlayOneShot(clip);
+                
+                // 等待一个固定延迟，或者 clip 的长度
+                yield return new WaitForSeconds(notePlaybackDelay); 
+            }
         }
+        
+        Debug.Log("回放结束。");
+        if (playbackButton != null)
+            playbackButton.interactable = true;
     }
     
-    public void PlayFootstepSound()
+    // (仅用于测试)
+    private void Update()
     {
-        if (effectAudio != null && footstepSounds.Length > 0)
+        // 按 'E' 键结束游戏 (测试用)
+        if (Input.GetKeyDown(KeyCode.E))
         {
-            int index = Random.Range(0, footstepSounds.Length);
-            effectAudio.PlayOneShot(footstepSounds[index]);
-        }
-    }
-    
-    public void PlayCubeHitSound(int cubeType)
-    {
-        if (effectAudio != null && cubeHitSounds.Length > cubeType)
-        {
-            effectAudio.PlayOneShot(cubeHitSounds[cubeType]);
+            EndGame();
         }
     }
 }
