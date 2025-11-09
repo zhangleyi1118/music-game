@@ -6,12 +6,12 @@ using TMPro; // 保持 TextMeshPro
 public class MusicGameManager : MonoBehaviour
 {
     [Header("游戏状态")]
-    public int score = 0;
+    public int orbsCollected = 0; // 替换 score
     
     [Header("UI组件")]
-    public TextMeshProUGUI scoreText;
-    public GameObject gameOverPanel; // 用于显示最终得分和播放按钮
-    public TextMeshProUGUI finalScoreText;
+    public TextMeshProUGUI orbCountText; // 替换 scoreText
+    public GameObject endLevelPanel; // 替换 gameOverPanel
+    public TextMeshProUGUI finalOrbCountText; // 替换 finalScoreText
     public UnityEngine.UI.Button playbackButton; // 播放音乐按钮
 
     [Header("音乐录制")]
@@ -47,14 +47,14 @@ public class MusicGameManager : MonoBehaviour
     
     public void InitializeGame()
     {
-        score = 0;
+        orbsCollected = 0;
         gameHasEnded = false;
         playedNotes.Clear();
         
         UpdateUI();
         
-        if (gameOverPanel != null)
-            gameOverPanel.SetActive(false);
+        if (endLevelPanel != null)
+            endLevelPanel.SetActive(false);
 
         if (playbackButton != null)
             playbackButton.onClick.AddListener(PlayRecordedMusic);
@@ -67,34 +67,42 @@ public class MusicGameManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 由 CubeController 调用
+    /// 由 CubeController 调用 (移除了 points)
     /// </summary>
-    public void RegisterNoteHit(int noteID, int points)
+    public void RegisterNoteHit(int noteID)
     {
         if (gameHasEnded) return;
 
         // 1. 录制音符
         playedNotes.Add(noteID);
         
-        // 2. 增加分数
-        score += points;
-        UpdateUI();
-        
-        // 3. 播放音效 (通过 AudioManager)
+        // 2. 播放音效 (通过 AudioManager)
         if (AudioManager.Instance != null)
         {
             AudioManager.Instance.PlayCubeHitSound(noteID);
-            AudioManager.Instance.PlayJumpSound(); // 玩家的跳跃音效
+            // 也许在这里也播放跳跃音效？
+            // AudioManager.Instance.PlayJumpSound(); 
         }
     }
 
     /// <summary>
-    /// 更新分数显示
+    /// 由新脚本 CollectibleNote 调用
+    /// </summary>
+    public void RegisterCollectibleHit()
+    {
+        if (gameHasEnded) return;
+        
+        orbsCollected++;
+        UpdateUI();
+    }
+
+    /// <summary>
+    /// 更新收集物显示
     /// </summary>
     private void UpdateUI()
     {
-        if (scoreText != null)
-            scoreText.text = $"Score: {score}";
+        if (orbCountText != null)
+            orbCountText.text = $"收集: {orbsCollected}";
     }
 
     /// <summary>
@@ -105,18 +113,18 @@ public class MusicGameManager : MonoBehaviour
         if (gameHasEnded) return;
         gameHasEnded = true;
         
-        if (gameOverPanel != null)
+        if (endLevelPanel != null)
         {
-            gameOverPanel.SetActive(true);
-            if (finalScoreText != null)
-                finalScoreText.text = $"Final Score: {score}";
+            endLevelPanel.SetActive(true);
+            if (finalOrbCountText != null)
+                finalOrbCountText.text = $"最终收集: {orbsCollected}";
         }
         
         Debug.Log("游戏结束! 录制的音符数量: " + playedNotes.Count);
     }
     
     /// <summary>
-    /// 播放录制好的音乐
+    /// 播放录制好的音乐 (这完全符合你的“在线听”需求)
     /// </summary>
     public void PlayRecordedMusic()
     {

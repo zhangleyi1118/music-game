@@ -6,12 +6,8 @@ public class CubeController : MonoBehaviour
     [Header("音符设置")]
     [Tooltip("音符ID (对应AudioManager中的cubeHitSounds索引)")]
     public int noteID = 0;
-    [Tooltip("是否为特殊方块（重音）")]
+    [Tooltip("是否为特殊方块（例如黑键，仅用于视觉区分）")]
     public bool isSpecial = false;
-
-    [Header("基础得分")]
-    public int baseScore = 100;
-    public int specialScore = 200;
 
     [Header("触发设置")]
     public float jumpTriggerHeight = 0.5f;
@@ -19,34 +15,36 @@ public class CubeController : MonoBehaviour
 
     [Header("效果设置")]
     [Tooltip("发光持续时间（秒）")]
-    public float glowDuration = 5.0f;
-    [Tooltip("普通音符颜色")]
+    public float glowDuration = 2.0f;
+    [Tooltip("消失后重生延迟（秒）")]
+    public float respawnDelay = 3.0f; 
+
+    [Tooltip("普通音符颜色（白键）")]
     public Color normalColor = Color.white;
-    [Tooltip("重音/闪烁颜色")]
-    public Color specialColor = Color.yellow;
+    [Tooltip("特殊音符颜色（黑键）")]
+    public Color specialColor = Color.black;
     [Tooltip("触发后发光颜色")]
     public Color glowColor = Color.cyan;
 
-    [Header("重音循环效果 (Idle)")]
-    [Tooltip("显示状态持续时间（秒）")]
+    [Header("特殊方块循环效果 (Idle)")]
+    [Tooltip("（此功能可选）显示状态持续时间（秒）")]
     public float idleShowDuration = 0.5f;
-    [Tooltip("消失状态持续时间（秒）")]
+    [Tooltip("（此功能可选）消失状态持续时间（秒）")]
     public float idleHideDuration = 0.5f;
 
     // 内部状态
     private Renderer cubeRenderer;
+    private Collider cubeCollider;
     private Color originalColor;
     private Transform playerTransform;
-    private CharacterBase playerCharacter;
-    private Coroutine idleLoopCoroutine;
     private Coroutine glowCoroutine;
-    private bool isGlowing = false;
+    private Coroutine idleLoopCoroutine;
     private Light cubeLight; // 发光组件
 
     public enum CubeState
     {
         Idle,           // 待机状态
-        Glowing         // 被触发后的发光状态
+        Triggered       // 被触发（发光和消失中）
     }
     private CubeState currentState = CubeState.Idle;
 
@@ -54,24 +52,21 @@ public class CubeController : MonoBehaviour
     private void Start()
     {
         cubeRenderer = GetComponent<Renderer>();
-        if (cubeRenderer != null)
-        {
-            // 确保获取的是材质实例
-            originalColor = cubeRenderer.material.color;
-        }
+        cubeCollider = GetComponent<Collider>();
 
         // 查找玩家
         GameObject player = GameObject.FindGameObjectWithTag(playerTag);
         if (player != null)
         {
             playerTransform = player.transform;
-            playerCharacter = player.GetComponent<CharacterBase>();
         }
 
         // 添加光源
         SetupLightComponent();
         
         // 根据是否为Special，设置初始状态
+        // 确保在SetupIdleState之前设置好originalColor
+        originalColor = isSpecial ? specialColor : normalColor;
         SetupIdleState();
     }
 
@@ -90,7 +85,6 @@ public class CubeController : MonoBehaviour
     private void SetupIdleState()
     {
         currentState = CubeState.Idle;
-        isGlowing = false;
 
         // 停止所有可能在运行的协程
         if (idleLoopCoroutine != null)
@@ -99,20 +93,13 @@ public class CubeController : MonoBehaviour
             StopCoroutine(glowCoroutine);
 
         // 确保可见
-        SetMaterialAlpha(1f);
-        gameObject.SetActive(true);
+        SetVisualsActive(true);
+        SetGlowEffect(false, originalColor); // 恢复原始颜色
 
         if (isSpecial)
         {
-            // 特殊方块/重音 -> 开始闪烁
-            originalColor = specialColor;
+            // 特殊方块/黑键 -> 开始闪烁 (如果你不希望黑键闪烁，可以注释掉下面这行)
             idleLoopCoroutine = StartCoroutine(IdleLoopRoutine());
-        }
-        else
-        {
-            // 普通方块 -> 保持静止颜色
-            originalColor = normalColor;
-            SetGlowEffect(false, normalColor);
         }
     }
 
@@ -143,35 +130,30 @@ public class CubeController : MonoBehaviour
     /// </summary>
     private void OnJumpTriggered()
     {
-        // 如果正在发光，不允许再次触发
-        if (currentState == CubeState.Glowing) return;
+        if (currentState == CubeState.Triggered) return;
 
-        currentState = CubeState.Glowing;
-        isGlowing = true;
+        currentState = CubeState.Triggered;
 
         // 1. 停止空闲闪烁
         if (idleLoopCoroutine != null)
             StopCoroutine(idleLoopCoroutine);
 
-        // 2. 强制设为可见
-        SetMaterialAlpha(1f);
-
-        // 3. 播放音效 & 加分
+        // 2. 播放音效 & 录制 (不再传递分数)
         if (MusicGameManager.Instance != null)
         {
-            MusicGameManager.Instance.RegisterNoteHit(noteID, isSpecial ? specialScore : baseScore);
+            MusicGameManager.Instance.RegisterNoteHit(noteID);
         }
 
-        // 4. 开始发光 & 变身协程
+        // 3. 开始发光 & 消失 & 重生 协程
         if (glowCoroutine != null)
             StopCoroutine(glowCoroutine);
-        glowCoroutine = StartCoroutine(GlowAndChangeRoutine());
+        glowCoroutine = StartCoroutine(GlowAndRespawnRoutine());
     }
 
     /// <summary>
-    /// 核心：发光5秒，然后随机变身
+    /// 核心：发光，消失，然后重生
     /// </summary>
-    private IEnumerator GlowAndChangeRoutine()
+    private IEnumerator GlowAndRespawnRoutine()
     {
         // 1. 立刻开始发光
         SetGlowEffect(true, glowColor);
@@ -179,21 +161,15 @@ public class CubeController : MonoBehaviour
         // 2. 等待发光时间
         yield return new WaitForSeconds(glowDuration);
 
-        // 3. 发光结束
+        // 3. 发光结束 & 消失
         SetGlowEffect(false, originalColor); // 恢复
-        isGlowing = false;
+        SetVisualsActive(false); // 隐藏
 
-        // 4. 随机变身
-        // 70% 几率变普通, 30% 几率变特殊 (你可以调整这个概率)
-        isSpecial = (Random.Range(0, 10) < 3);
-
-        // 随机一个新的音符ID
-        if (AudioManager.Instance != null)
-        {
-            noteID = Random.Range(0, AudioManager.Instance.GetMaxNoteTypes());
-        }
+        // 4. 等待重生时间
+        yield return new WaitForSeconds(respawnDelay);
 
         // 5. 重新进入待机状态
+        SetVisualsActive(true); // 显现
         SetupIdleState();
     }
 
@@ -207,10 +183,8 @@ public class CubeController : MonoBehaviour
         {
             // --- 1. 显示状态 ---
             SetMaterialAlpha(1f);
-            if (cubeRenderer != null) cubeRenderer.enabled = true;
             yield return new WaitForSeconds(idleShowDuration);
 
-            // 检查状态 (可能在等待时被触发)
             if (currentState != CubeState.Idle || !isSpecial) break;
 
             // --- 2. 消失状态 ---
@@ -219,9 +193,27 @@ public class CubeController : MonoBehaviour
 
             if (currentState != CubeState.Idle || !isSpecial) break;
         }
+        // 结束后确保恢复
+        SetMaterialAlpha(1f);
     }
 
     // --- 效果辅助方法 ---
+
+    private void SetVisualsActive(bool active)
+    {
+        if (cubeRenderer != null)
+            cubeRenderer.enabled = active;
+        if (cubeCollider != null)
+            cubeCollider.enabled = active;
+        if (cubeLight != null)
+            cubeLight.enabled = active;
+        
+        // 如果是禁用，也关闭发光效果
+        if (!active && cubeLight != null)
+        {
+             cubeLight.intensity = 0f;
+        }
+    }
 
     private void SetupLightComponent()
     {
@@ -240,7 +232,7 @@ public class CubeController : MonoBehaviour
     {
         if (cubeLight != null)
         {
-            cubeLight.enabled = enable;
+            cubeLight.enabled = true; // 即使关闭发光，组件也保持启用，仅控制强度
             cubeLight.intensity = enable ? 1.5f : 0f;
             cubeLight.color = color;
         }

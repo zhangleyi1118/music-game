@@ -16,7 +16,10 @@ public class AudioManager : MonoBehaviour
     public AudioClip jumpSound;
     public AudioClip climbSound;
     public AudioClip[] footstepSounds;
+    [Tooltip("方块音符库 (钢琴音)")]
     public AudioClip[] cubeHitSounds;
+    [Tooltip("特殊收集物音效库 (小圆球)")]
+    public AudioClip[] specialNoteSounds; // <-- 这是新添加的行
     public AudioClip staffLineHitSound;
     public AudioClip gameOverSound;
     
@@ -102,6 +105,23 @@ public class AudioManager : MonoBehaviour
     {
         if (cubeHitSounds.Length > cubeType && cubeHitSounds[cubeType] != null)
             sfxSource.PlayOneShot(cubeHitSounds[cubeType]);
+    }
+
+    /// <summary>
+    /// (新功能) 播放特殊小圆球音效
+    /// </summary>
+    public void PlaySpecialNoteSound(int noteID)
+    {
+        if (specialNoteSounds != null && specialNoteSounds.Length > noteID && noteID >= 0 && specialNoteSounds[noteID] != null)
+        {
+            sfxSource.PlayOneShot(specialNoteSounds[noteID]);
+        }
+        else if (specialNoteSounds != null && specialNoteSounds.Length > 0 && specialNoteSounds[0] != null)
+        {
+            // 如果ID无效或超出范围，播放第一个作为默认音效
+            Debug.LogWarning($"Special Note ID {noteID} not found, playing default.");
+            sfxSource.PlayOneShot(specialNoteSounds[0]);
+        }
     }
     
     public void PlayStaffLineHitSound()
